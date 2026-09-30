@@ -9,6 +9,8 @@ type Transaction = {
   proposed_allocation: string | null; final_allocation: string | null; status: string;
   proposed_richard_pct: number | null; proposed_anastasia_pct: number | null; proposed_jean_claude_pct: number | null;
   approved_richard_pct: number | null; approved_anastasia_pct: number | null; approved_jean_claude_pct: number | null;
+  sync_status: "pending" | "synced" | "failed" | null;
+  sync_error: string | null;
   employees: { name: string } | null;
 };
 
@@ -57,6 +59,13 @@ export default function Home() {
     if (response.ok) await refresh();
   }
 
+  async function retrySheetsSync(transaction: Transaction) {
+    const response = await fetch(`/api/transactions/${transaction.id}/sync`, { method: "POST" });
+    const data = await response.json();
+    setNotice(response.ok ? `${transaction.reference} synced to Google Sheets.` : data.error);
+    if (response.ok) await refresh();
+  }
+
   return <main>
     <header><p className="eyebrow">Friends Included Ltd</p><h1>Finance dashboard</h1><p>All friendships expire at checkout.</p></header>
     <section className="role"><label>Demonstration role<select value={selectedName} onChange={(e) => setSelectedName(e.target.value)}>{names.map((name) => <option key={name}>{name}</option>)}</select></label><span>{current ? current.role.replace("_", " ") : "Loading employees…"}</span></section>
@@ -65,7 +74,7 @@ export default function Home() {
     {current?.role === "salesperson" && <TransactionForm title="Record a sale" type="sale" onSubmit={submit} />}
     {current?.role === "expense_reporter" && <TransactionForm title="Record an expense" type="expense" onSubmit={submit} />}
     {current?.role === "manager" && <section><h2>Manager approval queue</h2><div className="list">{transactions.filter((t) => t.status === "pending_approval" || t.status === "awaiting_allocation").map((t) => <article className="record" key={t.id}><div><b>{t.reference}</b> · {t.transaction_type} · {money.format(Number(t.amount))}<br/><small>{t.description}</small></div><button onClick={() => approve(t)}>Approve proposed decision</button></article>)}{transactions.filter((t) => t.status === "pending_approval" || t.status === "awaiting_allocation").length === 0 && <p>Nothing awaits a decision.</p>}</div></section>}
-    <section><h2>Transaction records</h2><div className="list">{transactions.map((t) => <article className="record" key={t.id}><div><b>{t.reference}</b> · {t.transaction_type} · {money.format(Number(t.amount))}<br/><small>{t.employees?.name ?? "Unknown"} · {t.status} · {t.project ?? t.final_allocation ?? t.proposed_allocation}</small></div></article>)}{transactions.length === 0 && <p>No transactions yet.</p>}</div></section>
+    <section><h2>Transaction records</h2><div className="list">{transactions.map((t) => <article className="record" key={t.id}><div><b>{t.reference}</b> · {t.transaction_type} · {money.format(Number(t.amount))}<br/><small>{t.employees?.name ?? "Unknown"} · {t.status} · {t.project ?? t.final_allocation ?? t.proposed_allocation} · Sheets: {t.sync_status ?? "not synced"}</small>{t.sync_error && <small> · {t.sync_error}</small>}</div>{current?.role === "manager" && t.sync_status === "failed" && <button onClick={() => retrySheetsSync(t)}>Retry Sheets sync</button>}</article>)}{transactions.length === 0 && <p>No transactions yet.</p>}</div></section>
   </main>;
 }
 

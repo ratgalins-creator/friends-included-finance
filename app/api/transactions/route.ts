@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { syncAndRecordTransaction } from "@/lib/transaction-sync";
 
 function db() {
   const url = process.env.SUPABASE_URL;
@@ -33,9 +34,10 @@ export async function POST(request: Request) {
     if (roleError || !employee) throw new Error("The selected employee is invalid.");
     if (sale && employee.role !== "salesperson") throw new Error("Only salespeople can submit sales.");
     if (!sale && employee.role !== "expense_reporter") throw new Error("Only Kevin can submit expenses.");
-    const payload = sale ? { reference: input.reference, transaction_type: "sale", submitted_by: input.submittedBy, customer: input.customer, project: input.project, description: input.description, amount, proposed_richard_pct: richard, proposed_anastasia_pct: anastasia, proposed_jean_claude_pct: jean, status: "pending_approval" } : { reference: input.reference, transaction_type: "expense", submitted_by: input.submittedBy, description: input.description, amount, category: input.category, proposed_allocation: input.allocation, final_allocation: input.allocation === "Company overhead" ? "Company overhead" : null, status: input.allocation === "Company overhead" ? "overhead" : "awaiting_allocation" };
+    const payload = sale ? { reference: input.reference, transaction_type: "sale", submitted_by: input.submittedBy, customer: input.customer, project: input.project, description: input.description, amount, proposed_richard_pct: richard, proposed_anastasia_pct: anastasia, proposed_jean_claude_pct: jean, status: "pending_approval", sync_status: "pending" } : { reference: input.reference, transaction_type: "expense", submitted_by: input.submittedBy, description: input.description, amount, category: input.category, proposed_allocation: input.allocation, final_allocation: input.allocation === "Company overhead" ? "Company overhead" : null, status: input.allocation === "Company overhead" ? "overhead" : "awaiting_allocation", sync_status: "pending" };
     const { data, error } = await supabase.from("transactions").insert(payload as Record<string, unknown>).select().single();
     if (error) throw new Error(error.code === "23505" ? "That reference already exists." : error.message);
-    return NextResponse.json({ transaction: data }, { status: 201 });
+    const sync = await syncAndRecordTransaction(supabase, data.id);
+    return NextResponse.json({ transaction: data, sync }, { status: 201 });
   } catch (error) { return NextResponse.json({ error: error instanceof Error ? error.message : "Could not save transaction." }, { status: 400 }); }
 }
