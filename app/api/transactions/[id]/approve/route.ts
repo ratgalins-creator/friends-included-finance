@@ -15,7 +15,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     const supabase = db();
     const manager = await requireManager(supabase, String(input.actorId ?? ""));
     const { id } = await params;
-    const { data: record, error: findError } = await supabase.from("transactions").select("*, employees(name)").eq("id", id).single();
+    const { data: record, error: findError } = await supabase.from("transactions").select("*, employees!transactions_submitted_by_fkey(name)").eq("id", id).single();
     if (findError || !record) throw new Error("Transaction not found.");
     if (!["pending_approval", "awaiting_allocation"].includes(record.status)) return NextResponse.json({ ok: true, alreadyDecided: true, transaction: record });
 
@@ -41,7 +41,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       };
     }
 
-    const { data: updated, error: updateError } = await supabase.from("transactions").update(update).eq("id", id).select("*, employees(name)").single();
+    const { data: updated, error: updateError } = await supabase.from("transactions").update(update).eq("id", id).select("*, employees!transactions_submitted_by_fkey(name)").single();
     if (updateError || !updated) throw new Error(updateError?.message ?? "Could not save the manager decision.");
     const sync = await syncAndRecordTransaction(supabase, id);
     const notification = await recordAndSendNotification(supabase, id, "decision", updated.originating_telegram_chat_id, decisionMessage(updated));

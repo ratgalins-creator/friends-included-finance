@@ -67,7 +67,7 @@ export async function createTransaction(
     };
   }
 
-  const { data, error } = await supabase.from("transactions").insert(payload).select("*, employees(name)").single();
+  const { data, error } = await supabase.from("transactions").insert(payload).select("*, employees!transactions_submitted_by_fkey(name)").single();
   if (error) throw new Error(error.code === "23505" ? "That reference already exists." : error.message);
   const sync = await syncAndRecordTransaction(supabase, data.id);
   return { transaction: data, sync };

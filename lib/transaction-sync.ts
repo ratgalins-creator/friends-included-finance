@@ -4,7 +4,7 @@ import { syncTransactionToGoogleSheets } from "./google-sheets";
 export async function syncAndRecordTransaction(supabase: SupabaseClient, transactionId: string) {
   const { data: transaction, error: readError } = await supabase
     .from("transactions")
-    .select("*, employees(name)")
+    .select("*, employees!transactions_submitted_by_fkey(name)")
     .eq("id", transactionId)
     .single();
   if (readError || !transaction) return { ok: false, error: readError?.message ?? "Transaction was not found." };

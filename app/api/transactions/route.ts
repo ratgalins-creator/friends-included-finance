@@ -10,7 +10,7 @@ export async function GET() {
     const supabase = db();
     const [{ data: employees, error: employeeError }, { data: transactions, error: transactionError }, { data: contacts, error: contactError }] = await Promise.all([
       supabase.from("employees").select("id,name,role,telegram_user_id,telegram_chat_id").order("name"),
-      supabase.from("transactions").select("*, employees(name), transaction_notifications(*)").order("submitted_at", { ascending: false }),
+      supabase.from("transactions").select("*, employees!transactions_submitted_by_fkey(name), transaction_notifications(*)").order("submitted_at", { ascending: false }),
       supabase.from("telegram_contacts").select("*").order("last_seen_at", { ascending: false })
     ]);
     if (employeeError || transactionError || contactError) throw new Error(employeeError?.message ?? transactionError?.message ?? contactError?.message);
