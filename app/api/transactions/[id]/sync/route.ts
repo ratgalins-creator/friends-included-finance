@@ -1,13 +1,16 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { db, requireManager } from "@/lib/supabase";
 import { syncAndRecordTransaction } from "@/lib/transaction-sync";
 
-export async function POST(_: Request, { params }: { params: Promise<{ id: string }> }) {
+export const runtime = "nodejs";
+
+export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const url = process.env.SUPABASE_URL, key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-    if (!url || !key) throw new Error("Supabase environment variables are not configured.");
+    const { actorId } = await request.json();
+    const supabase = db();
+    await requireManager(supabase, String(actorId ?? ""));
     const { id } = await params;
-    const sync = await syncAndRecordTransaction(createClient(url, key), id);
+    const sync = await syncAndRecordTransaction(supabase, id);
     if (!sync.ok) throw new Error(sync.error);
     return NextResponse.json({ ok: true });
   } catch (error) {

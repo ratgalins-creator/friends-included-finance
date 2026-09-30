@@ -1,1 +1,42 @@
-:root { color-scheme: light; font-family: Arial, sans-serif; background:#f7f4f0; color:#26211d; } * { box-sizing:border-box; } body { margin:0; } main { max-width:1100px; margin:auto; padding:48px 24px 80px; } header { border-bottom:1px solid #d9d1c7; margin-bottom:24px; } h1 { margin:0 0 8px; font-size:42px; } h2 { margin-top:38px; } .eyebrow { color:#9a3f22; text-transform:uppercase; letter-spacing:.12em; font-weight:bold; font-size:12px; } .role, .totals, form { display:flex; gap:16px; flex-wrap:wrap; align-items:end; } .role { background:#fff; padding:16px; border-radius:10px; } label { display:grid; gap:6px; font-weight:bold; } input, select, button { padding:10px; font:inherit; border-radius:6px; border:1px solid #bdb5aa; } button { border:0; background:#9a3f22; color:#fff; font-weight:bold; cursor:pointer; } .notice { background:#f5dfcb; padding:12px; border-radius:6px; } .totals { margin:24px 0; } .totals article { background:#26211d; color:#fff; padding:18px; border-radius:10px; min-width:190px; flex:1; } .totals b, .totals strong { display:block; } .totals strong { margin-top:8px; font-size:24px; } form { background:#fff; padding:20px; border-radius:10px; } .list { display:grid; gap:10px; } .record { background:#fff; border-radius:8px; padding:14px; display:flex; justify-content:space-between; gap:12px; align-items:center; } small { color:#665f58; } @media (max-width:600px) { h1 { font-size:32px; } .record { align-items:flex-start; flex-direction:column; } }
+:root { color-scheme: light; font-family: Arial, sans-serif; background:#f7f4f0; color:#26211d; }
+* { box-sizing:border-box; }
+body { margin:0; }
+main { max-width:1180px; margin:auto; padding:48px 24px 80px; }
+header { border-bottom:1px solid #d9d1c7; margin-bottom:24px; }
+h1 { margin:0 0 8px; font-size:42px; }
+h2 { margin:38px 0 14px; }
+.eyebrow { color:#9a3f22; text-transform:uppercase; letter-spacing:.12em; font-weight:bold; font-size:12px; }
+.links { display:flex; gap:16px; flex-wrap:wrap; margin:18px 0; }
+a { color:#80401f; font-weight:bold; }
+.role, .totals, form, .splitInputs, .decisionControls, .contact > div:last-child, .actions { display:flex; gap:16px; flex-wrap:wrap; align-items:end; }
+.role { background:#fff; padding:16px; border-radius:10px; }
+label { display:grid; gap:6px; font-weight:bold; }
+input, select, button { padding:10px; font:inherit; border-radius:6px; border:1px solid #bdb5aa; }
+button { border:0; background:#9a3f22; color:#fff; font-weight:bold; cursor:pointer; }
+button:disabled { cursor:not-allowed; opacity:.5; }
+.inlineButton { padding:2px 6px; border-radius:3px; font-size:inherit; }
+.notice { background:#f5dfcb; padding:12px; border-radius:6px; }
+.totals { margin:24px 0; }
+.totals article { background:#26211d; color:#fff; padding:18px; border-radius:10px; min-width:190px; flex:1; }
+.totals b, .totals strong { display:block; }
+.totals strong { margin-top:8px; font-size:24px; }
+.dashboardGrid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:16px; }
+.dashboardCard { background:#fff; border-radius:10px; padding:18px; }
+.dashboardCard h2 { font-size:19px; margin:0 0 12px; }
+dl { display:grid; grid-template-columns:1fr auto; gap:8px 14px; margin:0; }
+dt { color:#665f58; } dd { margin:0; text-align:right; }
+form { background:#fff; padding:20px; border-radius:10px; }
+.list { display:grid; gap:10px; }
+.record { background:#fff; border-radius:8px; padding:14px; display:flex; justify-content:space-between; gap:16px; align-items:center; }
+.decision { align-items:flex-start; }
+.decisionControls { align-items:end; justify-content:flex-end; max-width:650px; }
+.decisionControls input { min-width:105px; }
+.splitInputs { gap:8px; }
+.splitInputs label { font-size:13px; }
+.line { display:block; margin-top:3px; }
+small { color:#665f58; }
+.instructions { margin-top:46px; border-top:1px solid #d9d1c7; }
+code { background:#eee7df; padding:2px 4px; border-radius:3px; }
+ol { line-height:1.6; }
+@media (max-width:850px) { .dashboardGrid { grid-template-columns:1fr; } }
+@media (max-width:600px) { main { padding:30px 16px 60px; } h1 { font-size:32px; } .record { align-items:flex-start; flex-direction:column; } .decisionControls { justify-content:flex-start; } }

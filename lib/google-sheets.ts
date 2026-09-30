@@ -1,4 +1,5 @@
 import { google } from "googleapis";
+import { commissionFor } from "@/lib/finance";
 
 type TransactionForSheet = {
   reference: string;
@@ -43,11 +44,6 @@ function percentage(value: number | string | null) {
   return value === null ? "" : Number(value);
 }
 
-function commission(amount: number | string, percentageValue: number | string | null) {
-  if (percentageValue === null) return "";
-  return Math.round(Number(amount) * 0.1 * Number(percentageValue)) / 100;
-}
-
 async function sheetsClient() {
   const credentials = JSON.parse(requiredEnvironment("GOOGLE_SERVICE_ACCOUNT_JSON"));
   const auth = new google.auth.GoogleAuth({
@@ -88,6 +84,7 @@ async function writeByReference(tab: string, headers: string[], row: (string | n
 
 export async function syncTransactionToGoogleSheets(transaction: TransactionForSheet) {
   if (transaction.transaction_type === "sale") {
+    const earned = commissionFor(transaction);
     await writeByReference("Sales", salesHeaders, [
       transaction.reference,
       new Date(transaction.submitted_at).toISOString(),
@@ -102,9 +99,9 @@ export async function syncTransactionToGoogleSheets(transaction: TransactionForS
       percentage(transaction.approved_richard_pct),
       percentage(transaction.approved_anastasia_pct),
       percentage(transaction.approved_jean_claude_pct),
-      commission(transaction.amount, transaction.approved_richard_pct),
-      commission(transaction.amount, transaction.approved_anastasia_pct),
-      commission(transaction.amount, transaction.approved_jean_claude_pct),
+      earned ? earned.richard / 100 : "",
+      earned ? earned.anastasia / 100 : "",
+      earned ? earned.jeanClaude / 100 : "",
       transaction.status
     ]);
   } else {
