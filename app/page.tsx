@@ -94,6 +94,7 @@ export default function Home() {
       <p className="eyebrow">Friends Included Ltd</p>
       <h1>Finance dashboard</h1>
       <p>All friendships expire at checkout.</p>
+      <p>Created by Markuss Aleksandrovs — Day 4 homework</p>
       <p className="links"><a href="https://github.com/ratgalins-creator/friends-included-finance" target="_blank">GitHub code</a><a href="https://docs.google.com/spreadsheets/d/1yEy83q8MKyIRvy9843Kn-8mpkv6Y-M-Ng1T80RpQXQk/edit?gid=0#gid=0" target="_blank">Google Sheets copy</a>{botUrl && <a href={botUrl} target="_blank">Telegram bot</a>}</p>
     </header>
 
