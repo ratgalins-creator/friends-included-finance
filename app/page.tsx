@@ -1,10 +1,10 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { calculateDashboard, commissionFor } from "@/lib/finance";
 
 type Role = "manager" | "salesperson" | "expense_reporter";
-type Employee = { id: string; name: string; role: Role; telegram_user_id: string | null; telegram_chat_id: string | null };
+type Employee = { id: string; name: string; role: Role };
 type Notification = { id: string; kind: string; status: "pending" | "sent" | "failed" | "not_required"; error: string | null };
 type Transaction = {
   id: string; reference: string; transaction_type: "sale" | "expense"; submitted_by: string; submitted_at: string;
@@ -13,7 +13,7 @@ type Transaction = {
   proposed_richard_pct: number | string | null; proposed_anastasia_pct: number | string | null; proposed_jean_claude_pct: number | string | null;
   approved_richard_pct: number | string | null; approved_anastasia_pct: number | string | null; approved_jean_claude_pct: number | string | null;
   sync_status: "pending" | "synced" | "failed" | null; sync_error: string | null;
-  submitted_via: "website" | "telegram"; originating_telegram_chat_id: string | null;
+  submitted_via: "website" | "telegram"; originating_telegram_chat_id?: string | null;
   employees: { name: string } | null; transaction_notifications?: Notification[];
 };
 type TelegramContact = { telegram_user_id: string; chat_id: string; username: string | null; first_name: string | null; employee_id: string | null; last_seen_at: string };
@@ -30,20 +30,47 @@ export default function Home() {
   const [selectedName, setSelectedName] = useState(names[0]);
   const [notice, setNotice] = useState("");
   const [botUrl, setBotUrl] = useState<string | null>(null);
+  const [loadedName, setLoadedName] = useState("");
+  const selectedNameRef = useRef(names[0]);
+  const requestVersion = useRef(0);
   const current = employees.find((employee) => employee.name === selectedName);
 
-  async function refresh() {
-    const response = await fetch("/api/transactions", { cache: "no-store" });
-    const data = await response.json();
-    if (!response.ok) { setNotice(data.error ?? "Could not load data."); return; }
-    setEmployees(data.employees ?? []); setTransactions(data.transactions ?? []); setContacts(data.contacts ?? []);
+  async function refresh(actorId = current?.id) {
+    const requestedName = selectedName;
+    if (requestedName !== selectedNameRef.current) return;
+    const version = ++requestVersion.current;
+    try {
+      const url = actorId ? `/api/transactions?actorId=${encodeURIComponent(actorId)}` : "/api/transactions";
+      const response = await fetch(url, { cache: "no-store" });
+      const data = await response.json();
+      // Ignore responses belonging to an earlier role or superseded refresh.
+      if (version !== requestVersion.current || requestedName !== selectedNameRef.current) return;
+      if (!response.ok) { setNotice(data.error ?? "Could not load data."); return; }
+      setEmployees(data.employees ?? []);
+      setTransactions(data.transactions ?? []);
+      setContacts(data.contacts ?? []);
+      setLoadedName(actorId ? requestedName : "");
+    } catch {
+      if (version === requestVersion.current && requestedName === selectedNameRef.current) {
+        setNotice("Could not load data. Refresh the page to try again.");
+      }
+    }
   }
 
   useEffect(() => { void refresh(); }, []);
+  useEffect(() => {
+    if (!current?.id) return;
+    setTransactions([]);
+    setContacts([]);
+    setLoadedName("");
+    setNotice("");
+    void refresh(current.id);
+  }, [current?.id]);
   useEffect(() => { fetch("/api/telegram/info").then((response) => response.json()).then((data) => setBotUrl(data.botUrl ?? null)).catch(() => undefined); }, []);
 
-  const dashboard = useMemo(() => calculateDashboard(transactions), [transactions]);
-  const visibleTransactions = current?.role === "manager" ? transactions : transactions.filter((transaction) => transaction.submitted_by === current?.id);
+  const dataReady = !!current && loadedName === selectedName;
+  const dashboard = useMemo(() => current?.role === "manager" && dataReady ? calculateDashboard(transactions) : null, [transactions, current?.role, dataReady]);
+  const visibleTransactions = !dataReady ? [] : current?.role === "manager" ? transactions : transactions.filter((transaction) => transaction.submitted_by === current?.id);
   const queue = transactions.filter((transaction) => transaction.status === "pending_approval" || transaction.status === "awaiting_allocation");
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -53,6 +80,7 @@ export default function Home() {
     body.submittedBy = current?.id ?? "";
     const response = await fetch("/api/transactions", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
     const data = await response.json();
+    if (selectedName !== selectedNameRef.current) return;
     setNotice(response.ok ? `${data.transaction.reference} saved. ${data.sync?.ok ? "Google Sheets synchronized." : "Google Sheets needs a retry."}` : data.error);
     if (response.ok) { formElement.reset(); await refresh(); }
   }
@@ -62,6 +90,7 @@ export default function Home() {
       method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ actorId: current?.id, ...values })
     });
     const data = await response.json();
+    if (selectedName !== selectedNameRef.current) return;
     if (!response.ok) setNotice(data.error);
     else setNotice(data.alreadyDecided ? `${transaction.reference} was already decided; totals were not changed.` : `${transaction.reference} decision saved. ${data.sync?.ok ? "Sheets synchronized." : "Sheets needs a retry."}`);
     if (response.ok) await refresh();
@@ -69,24 +98,38 @@ export default function Home() {
 
   async function retrySheets(transaction: Transaction) {
     const response = await fetch(`/api/transactions/${transaction.id}/sync`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ actorId: current?.id }) });
-    const data = await response.json(); setNotice(response.ok ? `${transaction.reference} synchronized to Google Sheets.` : data.error); if (response.ok) await refresh();
+    const data = await response.json();
+    if (selectedName !== selectedNameRef.current) return; setNotice(response.ok ? `${transaction.reference} synchronized to Google Sheets.` : data.error); if (response.ok) await refresh();
   }
 
   async function retryTelegram(transaction: Transaction, notification: Notification) {
     const response = await fetch(`/api/transactions/${transaction.id}/notifications/${notification.id}/retry`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ actorId: current?.id }) });
-    const data = await response.json(); setNotice(response.ok ? "Telegram delivery retried." : data.error); if (response.ok) await refresh();
+    const data = await response.json();
+    if (selectedName !== selectedNameRef.current) return; setNotice(response.ok ? "Telegram delivery retried." : data.error); if (response.ok) await refresh();
   }
 
   async function linkContact(telegramUserId: string, employeeId: string) {
     const response = await fetch("/api/telegram/links", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ actorId: current?.id, telegramUserId, employeeId }) });
-    const data = await response.json(); setNotice(response.ok ? data.message : data.error); if (response.ok) await refresh();
+    const data = await response.json();
+    if (selectedName !== selectedNameRef.current) return; setNotice(response.ok ? data.message : data.error); if (response.ok) await refresh();
   }
 
   async function connectBot() {
     const response = await fetch("/api/telegram/setup", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ actorId: current?.id }) });
     const data = await response.json();
+    if (selectedName !== selectedNameRef.current) return;
     setNotice(response.ok ? "Telegram webhook connected. Send /start to the bot next." : data.error);
     if (data.botUrl) setBotUrl(data.botUrl);
+  }
+
+  function changeRole(name: string) {
+    selectedNameRef.current = name;
+    ++requestVersion.current;
+    setTransactions([]);
+    setContacts([]);
+    setLoadedName("");
+    setNotice("");
+    setSelectedName(name);
   }
 
   return <main>
@@ -99,17 +142,17 @@ export default function Home() {
     </header>
 
     <section className="role">
-      <label>Demonstration role<select value={selectedName} onChange={(event) => setSelectedName(event.target.value)}>{names.map((name) => <option key={name}>{name}</option>)}</select></label>
+      <label>Demonstration role<select value={selectedName} disabled={employees.length === 0} onChange={(event) => changeRole(event.target.value)}>{names.map((name) => <option key={name}>{name}</option>)}</select></label>
       <span>{current ? current.role.replace("_", " ") : "Loading employees…"}</span>
     </section>
     {notice && <p className="notice">{notice}</p>}
 
-    <FinanceDashboard dashboard={dashboard} />
+    {current?.role === "manager" && dashboard && <FinanceDashboard dashboard={dashboard} />}
 
     {current?.role === "salesperson" && <TransactionForm title="Record a sale" type="sale" onSubmit={submit} />}
     {current?.role === "expense_reporter" && <TransactionForm title="Record an expense" type="expense" onSubmit={submit} />}
 
-    {current?.role === "manager" && <>
+    {current?.role === "manager" && dataReady && <>
       <section>
         <h2>Manager approval queue</h2>
         <div className="list">{queue.map((transaction) => <DecisionCard key={transaction.id} transaction={transaction} onApprove={approve} />)}{queue.length === 0 && <p>Nothing awaits a decision.</p>}</div>
@@ -123,13 +166,13 @@ export default function Home() {
 
     <section>
       <h2>{current?.role === "manager" ? "All transaction records" : "My transaction records"}</h2>
-      <div className="list">{visibleTransactions.map((transaction) => <TransactionRecord key={transaction.id} transaction={transaction} manager={current?.role === "manager"} onRetrySheets={retrySheets} onRetryTelegram={retryTelegram} />)}{visibleTransactions.length === 0 && <p>No transactions yet.</p>}</div>
+      <div className="list">{visibleTransactions.map((transaction) => <TransactionRecord key={transaction.id} transaction={transaction} manager={current?.role === "manager"} onRetrySheets={retrySheets} onRetryTelegram={retryTelegram} />)}{!dataReady ? <p>Loading records…</p> : visibleTransactions.length === 0 && <p>No transactions yet.</p>}</div>
     </section>
 
     <section className="instructions">
       <h2>How to test</h2>
       <ol>
-        <li>Choose a demonstration role to enter a transaction or approve a decision.</li>
+        <li>Choose a demonstration role to enter a transaction or approve a decision. This selector is for coursework demonstration, not a secure sign-in system.</li>
         <li>For the required bot test, send <code>/start</code> to the Telegram bot, select Svetlana here, and link the displayed Telegram contact to the fictional employee.</li>
         <li>Use <code>/sale</code> or <code>/expense</code> in the private bot chat. The record is saved in Supabase, copied to Sheets, and remains tied to that original chat for later decisions.</li>
         <li>Google Sheets is read-only evidence: edits there never change the application.</li>
@@ -187,3 +230,4 @@ function TransactionRecord({ transaction, manager, onRetrySheets, onRetryTelegra
     {manager && !transaction.originating_telegram_chat_id && <small className="line">Telegram recipient: No Telegram recipient linked.</small>}
   </div><div className="actions">{manager && transaction.sync_status === "failed" && <button onClick={() => void onRetrySheets(transaction)}>Retry Sheets sync</button>}{manager && decisions.filter((notification) => notification.status === "failed").map((notification) => <button key={notification.id} onClick={() => void onRetryTelegram(transaction, notification)}>Retry Telegram delivery</button>)}</div></article>;
 }
+
